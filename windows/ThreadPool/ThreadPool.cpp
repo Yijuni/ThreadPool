@@ -44,7 +44,7 @@ void ThreadPool::SetTaskQueueMaxThreshold(int threshold)
 }
 
 
-void ThreadPool::SubmitTask(std::shared_ptr<Task> task)
+Result ThreadPool::SubmitTask(std::shared_ptr<Task> task)
 {
 	
 	//获取锁
@@ -59,13 +59,15 @@ void ThreadPool::SubmitTask(std::shared_ptr<Task> task)
 	if (!flag) {
 		//等待了1s，队列仍然是满的，那就任务提交失败
 		std::cerr << "task queue is full ,submit task fail." << std::endl;
-		return;
+		return Result(task,false);
 	}
 	//任务放进任务队列中
 	taskQueue_m.emplace(task);
 	taskSize_m++;
 	//通知消费者线程有任务快去执行
 	notEmptyCond_m.notify_all();
+	
+	return Result(task);
 }
 
 
@@ -94,7 +96,7 @@ void ThreadPool::ThreadFunc()
 
 		if (task != nullptr) {
 			std::cout << "tid: " << std::this_thread::get_id() << "获取任务成功" << std::endl;
-			task->Run();//多态执行用户自定义的任务
+			task->exec();//执行用户提交任务并处理Result
 			//任务执行完，通知
 		}
 	}
@@ -120,4 +122,70 @@ void Thread::Start()
 	std::thread t(func_m);
 	t.detach();//分离线程，防止任务被挂掉
 
+}
+
+
+Semaphore::Semaphore(int source) :source_m(source)
+{
+}
+
+Semaphore::~Semaphore()
+{
+}
+
+void Semaphore::wait()
+{
+	std::unique_lock<std::mutex> lock(mutex_m);
+	cond_m.wait(lock, [&]()->bool {return source_m > 0; });
+	source_m--;
+}
+
+void Semaphore::post()
+{
+	std::unique_lock<std::mutex> lock(mutex_m);
+	source_m++;
+	cond_m.notify_all();
+}
+
+Result::Result()
+{
+}
+
+Result::Result(std::shared_ptr<Task> task,bool isValid):task_m(task),isValid_m(isValid)
+{
+	task->setResult(this);
+}
+
+Result::~Result()
+{
+}
+
+void Result::SetVal(Any res)
+{
+	any_m = std::move(res);//任务执行完把结果给Result内的any_m
+	sem_m.post();//任务执行完，会调用这个函数，信号量+1(source=1)
+}
+
+Any Result::Get()
+{
+	if (!isValid_m) {
+		return "";
+	}
+	sem_m.wait();//任务没执行完，这个位置会阻塞(source_m=0)
+	return std::move(any_m);
+}
+
+Task::Task():res_m(nullptr)
+{
+}
+
+void Task::exec()
+{
+	if (res_m == nullptr) return;
+	res_m->SetVal(Run());//这里发生多态调用，这样就可以帮用户执行任务，而且还能进行其他处理（告诉Result执行完了)
+}
+
+void Task::setResult(Result* res)
+{
+	res_m = res;
 }

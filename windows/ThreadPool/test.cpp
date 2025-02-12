@@ -7,15 +7,16 @@ public:
 		begin_m(begin),end_m(end)
 	{
 	}
-	MyTask();
-	~MyTask();
-	void Run() {
+	MyTask() = default;
+	~MyTask() = default;
+	Any Run() {
 		std::cout << "tid: " << std::this_thread::get_id() << "begin!" << std::endl;
-		int sum = 0;
+		long long sum = 0;
 		for (int i = begin_m; i <= end_m; i++) {
 			sum += i;
 		}
 		std::cout << "tid: " << std::this_thread::get_id() << "end!" << std::endl;
+		return sum;
 	}
 private:
 	int begin_m;
@@ -25,9 +26,23 @@ private:
 int main() {
 	ThreadPool pool;
 	pool.Start(5);
-	for (int i = 0; i < 12; i++) {
-		pool.SubmitTask(std::make_shared<MyTask>());
+	Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1,100));
+	Result res2 = pool.SubmitTask(std::make_shared<MyTask>(101,1000));
+	Result res3 = pool.SubmitTask(std::make_shared<MyTask>(1001,10000));
+	Result res4 = pool.SubmitTask(std::make_shared<MyTask>(10001,100000));
+	long long sum = 0;
+	long long valid = 0;
+	sum += res1.Get().Cast_<long long>();
+	sum += res2.Get().Cast_<long long>();
+	sum += res3.Get().Cast_<long long>();
+	sum += res4.Get().Cast_<long long>();
+	std::cout << "最终结果" << std::endl;
+	std::cout << sum << std::endl;
+	for (int i = 1; i <= 100000; i++) {
+		valid += i;
 	}
+	std::cout << "对比结果" << std::endl;
+	std::cout << valid << std::endl;
 	char c = std::getchar();
 	return 0;
 }
