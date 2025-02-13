@@ -9,7 +9,7 @@
 #include<memory>
 #include <functional>
 #include <thread>
-
+#include <unordered_map>
 //Any类型可接受任意类型
 class Any {
 public:
@@ -113,14 +113,17 @@ enum class ThreadPoolMod{//加class防止枚举项命名冲突
 class Thread
 {
 public:
-	using ThreadFunc = std::function<void()>;
-	Thread();
+	using ThreadFunc = std::function<void(int)>;
 	Thread(ThreadFunc func);
 	~Thread();
 	//线程启动
 	void Start();
+	//获取线程ID
+	int GetId() const;
 private:
 	ThreadFunc func_m;
+	static int generateId_m;
+	int threadId_m;//保存线程ID
 };
 /*
 	EXAMPLE:
@@ -152,25 +155,35 @@ public:
 	void SetTaskQueueMaxThreshold(int threshold);
 	//给线程池提交任务
 	Result SubmitTask(std::shared_ptr<Task> task);
-
+	//设置线程池cached模型下线程数阈值
+	void SetThreadMaxThreshold(int threshold);
 	ThreadPool(const ThreadPool&) = delete;
 	ThreadPool& operator=(const ThreadPool&) = delete;
 private:
 	//定义线程函数,运行在不同的线程中，来从任务队列里取任务执行
-	void ThreadFunc();
+	void ThreadFunc(int threadId);//传入线程id，方便后序删除线程
+	//检查pool的运行状态
+	bool CheckRunningState() const;
 
-	std::vector<std::unique_ptr<Thread>> threadPool_m;//线程池
+	//std::vector<std::unique_ptr<Thread>> threadPool_m;//线程池
+	std::unordered_map<int, std::unique_ptr<Thread>> threadPool_m;
 	size_t initThreadSize_m;//初始线程数
 	ThreadPoolMod poolMod_m;
+	size_t threadMaxThreshold_m;//线程数量上限阈值
+	//记录空闲线程数
+	std::atomic_uint idleThreadSize_m;
+	//记录线程池里线程总数量
+	std::atomic_int curThreadSize_m;
+	//记录线程池是否启动
+	std::atomic_bool poolIsRunning_m;
+
 	//用智能指针，防止任务还未执行完，任务就被释放了（生命周期延长）
 	std::queue<std::shared_ptr<Task>> taskQueue_m; //任务队列
 	std::atomic_uint taskSize_m; //任务数量(原子类型，该类型的数据修改都是原子操作）
 	size_t taskQueueMaxThreshold_m; //任务数量上限阈值
-
 	std::mutex taskQueueMtx_m; //任务队列的线程安全
 	std::condition_variable notFullCond_m; //任务队列不满
-	std::condition_variable notEmptyCond_m; //任务队列不空
-	
+	std::condition_variable notEmptyCond_m; //任务队列不空	
 
 };
 
