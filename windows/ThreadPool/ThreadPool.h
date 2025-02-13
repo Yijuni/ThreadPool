@@ -10,6 +10,7 @@
 #include <functional>
 #include <thread>
 #include <unordered_map>
+
 //Any类型可接受任意类型
 class Any {
 public:
@@ -149,8 +150,8 @@ public:
 	~ThreadPool();
 	//设置线程池模式
 	void SetMode(ThreadPoolMod mode=ThreadPoolMod::MODE_FIXED);
-	//启用线程池
-	void Start(int initThreadSize=4);
+	//启用线程池,默认值系统CPU核心数
+	void Start(int initThreadSize=std::thread::hardware_concurrency());
 	//设置任务队列数量上限阈值
 	void SetTaskQueueMaxThreshold(int threshold);
 	//给线程池提交任务
@@ -184,6 +185,7 @@ private:
 	std::mutex taskQueueMtx_m; //任务队列的线程安全
 	std::condition_variable notFullCond_m; //任务队列不满
 	std::condition_variable notEmptyCond_m; //任务队列不空	
+	std::condition_variable exitCond_m;//等待线程资源全部回收
 
 };
 
