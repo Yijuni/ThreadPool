@@ -11,7 +11,7 @@ public:
 	~MyTask() = default;
 	Any Run() {
 		std::cout << "tid: " << std::this_thread::get_id() << "begin!" << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(5));
+		//std::this_thread::sleep_for(std::chrono::seconds(5));
 		long long sum = 0;
 		for (int i = begin_m; i <= end_m; i++) {
 			sum += i;
@@ -52,12 +52,18 @@ int main() {
 	}
 	char c = std::getchar();
 #endif
-	ThreadPool pool;
-	pool.SetMode(ThreadPoolMod::MODE_CACHED);
-	pool.Start(3);
-	Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 100));
-	res1.Get().Cast_<long long>();
+//#if 0
+	//可能出现死锁的代码
+	{
+		ThreadPool pool;
+		pool.SetMode(ThreadPoolMod::MODE_CACHED);
+		pool.Start(3);
+		Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 100));
+		res1.Get().Cast_<long long>();
+	}
 	std::cout << "main end!" << std::endl;
+	getchar();
+//#endif
 
 	return 0;
 }
