@@ -111,7 +111,8 @@ void ThreadPool::ThreadFunc(int threadId)
 {
 	auto lastRunTime = std::chrono::high_resolution_clock().now();//高精度时间
 	std::cout << "begin threadFunc t_id="<< std::this_thread::get_id() << std::endl;
-	while(poolIsRunning_m) {
+	//所有任务执行完才退出线程
+	while(true) {
 		std::shared_ptr<Task> task;
 		{//获取完任务之后，确保锁自动释放，让其他线程使用，本线程执行取到的任务(否则同一时刻只有一个线程在执行任务）
 			//先获取锁
@@ -121,7 +122,16 @@ void ThreadPool::ThreadFunc(int threadId)
 			//多余的线程就是指超过initThreadSize_m的线程数
 			//当前时间 - 上一次执行的时间 > 60s
 				//每一秒钟返回一次
-			while (poolIsRunning_m && taskSize_m <= 0) {//任务数量小于等于0,就等待，防止虚假唤醒
+			while (taskSize_m <= 0) {//任务数量小于等于0,就等待，防止虚假唤醒
+				if (!poolIsRunning_m) {//没任务并且线程池要退出，那就释放线程
+					//回收线程
+					threadPool_m.erase(threadId);
+					curThreadSize_m--;
+					idleThreadSize_m--;
+					std::cout << "thread id : " << std::this_thread::get_id() << "exit!" << std::endl;
+					exitCond_m.notify_all();
+					return;
+				}
 				if (poolMod_m == ThreadPoolMod::MODE_CACHED) {
 					if (std::cv_status::timeout == notEmptyCond_m.wait_for(lock, std::chrono::seconds(1))) {//等待超时1s
 						auto now = std::chrono::high_resolution_clock().now();
@@ -155,12 +165,6 @@ void ThreadPool::ThreadFunc(int threadId)
 				//	return;
 				//}
 			}
-
-			//线程池要退出，回收线程资源了
-			if (!poolIsRunning_m) {
-				break;
-			}
-
 			idleThreadSize_m--;//有任务要处理了，所以空闲线程数减小
 			//取一个任务执行
 			task = taskQueue_m.front();
@@ -183,13 +187,7 @@ void ThreadPool::ThreadFunc(int threadId)
 		lastRunTime = std::chrono::high_resolution_clock().now();//更新任务执行完的时间
 	}
 	//跳出了while循环说明线程池要结束了
-	//回收线程
-	threadPool_m.erase(threadId);
-	curThreadSize_m--;
-	idleThreadSize_m--;
-	std::cout << "thread id : " << std::this_thread::get_id() << "exit!" << std::endl;
-	exitCond_m.notify_all();
-	return;
+
 }
 
 bool ThreadPool::CheckRunningState() const

@@ -25,7 +25,7 @@ private:
 };
 
 int main() {
-#if 0
+//#if 0
 	{
 		ThreadPool pool;
 		pool.SetMode(ThreadPoolMod::MODE_CACHED);
@@ -50,9 +50,8 @@ int main() {
 		std::cout << "对比结果" << std::endl;
 		std::cout << valid << std::endl;
 	}
-	char c = std::getchar();
-#endif
-//#if 0
+//#endif
+#if 0
 	//可能出现死锁的代码
 	{
 		ThreadPool pool;
@@ -63,7 +62,7 @@ int main() {
 	}
 	std::cout << "main end!" << std::endl;
 	getchar();
-//#endif
+#endif
 
 	return 0;
 }
